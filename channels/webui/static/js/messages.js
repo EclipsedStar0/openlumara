@@ -2,10 +2,16 @@
 // Message Rendering - OpenAI-Compliant
 // =============================================================================
 
+let messagesAnimated = false;
+
 /**
  * Render all messages with proper turn handling.
  */
 function renderAllMessages(messages, animate = false) {
+    if (animate) messagesAnimated = false;
+    const shouldAnimate = !messagesAnimated && animate;
+    if (shouldAnimate) messagesAnimated = true;
+
     const wrappers = chat.querySelectorAll('.message-wrapper');
     wrappers.forEach(wrapper => wrapper.remove());
 
@@ -22,16 +28,16 @@ function renderAllMessages(messages, animate = false) {
             // Collect complete assistant turn (may span multiple messages due to tool calls)
             const turnInfo = collectAssistantTurn(messages, i);
             if (turnInfo.messages.length > 0) {
-                renderAssistantTurn(turnInfo.messages, turnInfo.endIndex, animate);
+                renderAssistantTurn(turnInfo.messages, turnInfo.endIndex, shouldAnimate);
                 i = turnInfo.endIndex + 1;
             } else {
                 // Empty turn (e.g., starts with announcement or command output) - render as single message
-                renderSingleMessage(msg, i, animate);
+                renderSingleMessage(msg, i, shouldAnimate);
                 i++;
             }
         } else {
             // Single message (user, tool, command, etc.)
-            renderSingleMessage(msg, i, animate);
+            renderSingleMessage(msg, i, shouldAnimate);
             i++;
         }
     }
