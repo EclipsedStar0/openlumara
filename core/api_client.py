@@ -282,6 +282,9 @@ class APIClient():
         reasoning_tokens = []
 
         token_usage = None
+        total_prompt_tokens = 0
+        total_completion_tokens = 0
+        has_usage_data = False
 
         if not response:
             return
@@ -354,7 +357,17 @@ class APIClient():
 
                 # if response has usage data, save it so we can use it to show to the user and to trim context
                 if hasattr(chunk, 'usage') and chunk.usage is not None:
-                    token_usage = chunk.usage.prompt_tokens
+                    has_usage_data = True
+                    # Store the most recent usage data
+                    if hasattr(chunk.usage, 'prompt_tokens'):
+                        total_prompt_tokens = chunk.usage.prompt_tokens
+                    if hasattr(chunk.usage, 'completion_tokens'):
+                        total_completion_tokens = chunk.usage.completion_tokens
+                    if hasattr(chunk.usage, 'total_tokens'):
+                        token_usage = chunk.usage.total_tokens
+                    elif total_prompt_tokens > 0 or total_completion_tokens > 0:
+                        # Calculate total if not provided
+                        token_usage = total_prompt_tokens + total_completion_tokens
 
             if use_tools:
                 for index in sorted(tool_call_buffer.keys()):
@@ -369,8 +382,17 @@ class APIClient():
                     # yield the full toolcall object as a single token to be interpreted by the function that is iterating through _recv_stream()
                     yield {"type": "tool_calls", "content": final_tool_calls}
 
-            # yield token usage as a seperate token
-            yield {"type": "token_usage", "content": token_usage}
+            # yield token usage as a separate token
+            # Prefer prompt_tokens for context window tracking if available
+            if has_usage_data:
+                # Store prompt_tokens if available, otherwise use total tokens
+                usage_to_store = total_prompt_tokens if total_prompt_tokens > 0 else token_usage
+                if usage_to_store is not None:
+                    yield {"type": "token_usage", "content": usage_to_store}
+                else:
+                    # API returned usage object but no token counts
+                    # This shouldn't happen with proper OpenAI-compatible APIs
+                    core.log("API", "API returned usage object but no token counts")
 
         except Exception as e:
             core.log_error("error while receiving response from AI", e)

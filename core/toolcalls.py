@@ -69,10 +69,11 @@ class ToolcallManager:
             repaired_tool_calls.append(tool_call)
         return repaired_tool_calls
 
-    async def process(self, tool_calls, assistant_content="", assistant_reasoning=""):
+    async def process(self, tool_calls, assistant_content="", assistant_reasoning="", accumulated_usage=0):
         """
         process tool calls from an API response..
         assistant_content is the "normal" non-toolcall content, the text that the AI wants to say that's not toolcalls
+        accumulated_usage is the total token usage accumulated from parent recursive calls
         """
 
         # this is, once again, a very badly documented thing in openAI's chat completions docs
@@ -175,32 +176,14 @@ class ToolcallManager:
             await self.channel.announce("toolcalling chain cancelled", "info")
             return
 
-        # # build the toolcalling prompt
-        # try:
-        #     # attempt to get chat message history
-        #     context = await self.channel.context.chat.get()
-        # except:
-        #     # in case we don't have a chat, just use a blank messages array
-        #     context = {}
-
-        # prompt = [
-        #     {
-        #         "role": "system",
-        #         "content": (
-        #             "If the tool response provides sufficient answers, "
-        #             "explain the results to the user. If not, call another tool."
-        #         )
-        #     }
-        # ] + context
-
         final_content = []
         final_reasoning = []
         had_recursive_call = False
-        total_tool_usage = 0
+        total_tool_usage = accumulated_usage  # Start with accumulated usage from parent calls
 
         try:
             async for token in self.channel.manager.API.send_stream(
-                await self.channel.context.get(end_prompt=False),
+                await self.channel.context.get(end_prompt=True, prevent_recursion=True),
                 tools=self.channel.manager.tools
             ):
                 token_type = token.get("type")
@@ -227,17 +210,23 @@ class ToolcallManager:
                         yield token
 
                     # the AI has decided to call more tools, so we make a recursive call
+                    # Pass along the accumulated token usage
                     async for sub_token in self.process(
                         repaired_tool_calls if tool_calls else [],
                         assistant_content="".join(final_content),
-                        assistant_reasoning="".join(final_reasoning)
+                        assistant_reasoning="".join(final_reasoning),
+                        accumulated_usage=total_tool_usage
                     ):
                         yield sub_token
 
                 if token_type == "token_usage":
                     usage = token.get("content")
                     if usage is not None:
-                        total_tool_usage = usage
+                        # Accumulate token usage, don't overwrite
+                        # Each API call's token usage should be added to the total
+                        # However, note: later API calls include previous messages in context,
+                        # so their token counts include tokens already counted.
+                        total_tool_usage = max(total_tool_usage, usage)
                         # Yield it to the frontend so the token bar updates in real-time
                         yield token
 
@@ -263,6 +252,3 @@ class ToolcallManager:
                 f"Error while handling tool calls: {e}",
                 "error"
             )
-
-        if total_tool_usage > 0:
-            self.channel.context.chat.token_usage = total_tool_usage

@@ -71,16 +71,24 @@ class Context:
         message_history = await self.get(system_prompt=False)
         sysprompt = await self.channel.manager.get_system_prompt()
         histend = await self.channel.manager.get_end_prompt()
+        
+        # Use the chat's count_tokens method for consistency
         sysprompt_size_tokens = await self.chat.count_tokens([{"role": "system", "content": sysprompt}])
         sysprompt_size_words = len(str(sysprompt).split())
+        
         message_hist_size_tokens = await self.chat.count_tokens(await self.chat.get())
         message_hist_size_words = len(str(message_history).split())
-        histend_size_tokens = await self.chat.count_tokens([{"role": "user", "content": histend}])
-        histend_size_words = len(str(histend).split())
+        
+        histend_size_tokens = await self.chat.count_tokens([{"role": "user", "content": histend}]) if histend else 0
+        histend_size_words = len(str(histend).split()) if histend else 0
 
-        combined_size_words = message_hist_size_words+sysprompt_size_words+histend_size_words
+        combined_size_words = message_hist_size_words + sysprompt_size_words + histend_size_words
 
-        token_usage = await self.chat.count_tokens(await self.get(system_prompt=True))
+        # Get total token usage - prefer API-provided usage if available
+        if hasattr(self.chat, 'token_usage') and self.chat.token_usage > 0:
+            token_usage = self.chat.token_usage
+        else:
+            token_usage = await self.chat.count_tokens(await self.get(system_prompt=True))
 
         return {
             "system prompt size": f"{sysprompt_size_tokens} tokens | {sysprompt_size_words} words",
@@ -92,7 +100,15 @@ class Context:
     async def get_token_usage(self):
         max_tokens = core.config.get("api").get("max_context", 8192)
 
-        # we use prevent_recursive to tell the system prompt retrieval
+        # First, check if we have API-provided token usage from the last response
+        if hasattr(self.chat, 'token_usage') and self.chat.token_usage > 0:
+            return {
+                "current": self.chat.token_usage,
+                "max": max_tokens
+            }
+
+        # Otherwise, calculate token usage locally
+        # we use prevent_recursion to tell the system prompt retrieval
         # call in self.get() to not include token usage data
 
         try:
@@ -102,6 +118,8 @@ class Context:
             return {"current": 0, "max": max_tokens}
         except Exception as e:
             core.log_error("error while fetching token usage", e)
+            # Return a conservative estimate on error
+            return {"current": 0, "max": max_tokens}
 
         return {
             "current": prompt_tokens,
