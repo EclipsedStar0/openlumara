@@ -469,10 +469,15 @@ core:
                 context_display = []
 
                 for message in context:
+                    if message.get("role") == "tool": continue
+
                     content = message.get("content")
                     if not content:
-                        if message.get("tool_calls"):
-                            content = str(self.channel.tc_manager.display_call(message.get("tool_calls")))
+                        content = ""
+                        tool_calls = message.get("tool_calls")
+                        if tool_calls:
+                            for tool_call in tool_calls:
+                                content += self.channel.tc_manager.display_call(tool_call)
 
                     context_display.append(f"== {message.get('role')} ==\n{content}")
 
