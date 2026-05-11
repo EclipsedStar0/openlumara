@@ -4,6 +4,8 @@ import asyncio
 import datetime
 import json_repair
 
+CHUNK_SIZE = 400
+
 class Client(discord.Client):
     def __init__(self, channel, **kwargs):
         super(Client, self).__init__(**kwargs)
@@ -11,74 +13,34 @@ class Client(discord.Client):
 
     async def _stream_to_discord(self, token_stream, discord_channel):
         """streams a message to discord in steps"""
-        message_obj = await discord_channel.send("...", mention_author=self.ai_channel.config.get("use_replies"))
+        message_obj = await discord_channel.send("...")
 
-        # Buffers for the CURRENT active discord message
-        current_text_buffer = []
-        current_tool_buffer = []
-
-        # Buffer for the full response text (for return value)
-        full_response_text = []
+        message_content = []
 
         next_edit_time = datetime.datetime.now()
-
-        # Discord limit is 2000, leave some room for formatting/newlines
-        MAX_CHARS = 1900
-
+        message_content_full = []
         shown_reasoning_text = False
-
         async with message_obj.channel.typing():
             async for token in token_stream:
-                t_type = token.get("type")
-                content = token.get("content", "")
-
-                if t_type != "content":
-                    continue
-
-                if content:
-                    current_text_buffer.append(content)
-                    full_response_text.append(content)
-
-                text_part = "".join(current_text_buffer)
-                visual_buffer = text_part
-
-                # Check if we need to split
-                # We split if the current buffer exceeds the character limit
-                if len(visual_buffer) >= MAX_CHARS:
-                    # Finalize current message
-                    if visual_buffer:
-                        await message_obj.edit(content=visual_buffer)
-
-                    # Start a new message
+                # if tokens exceed 200, add a new message to target for the edits
+                if len(message_content) >= CHUNK_SIZE:
+                    message_content = []
                     message_obj = await discord_channel.send("...")
 
-                    # CLEAR the buffers for the new message so we don't repeat text
-                    current_text_buffer = []
-                    current_tool_buffer = []
+                word = token.get("content")
+                message_content.append(word)
+                message_content_full.append(word)
 
-                    # Reset reasoning state for the new message if needed
-                    shown_reasoning_text = False
-
-                    # Update next edit time to avoid rate limits
+                # edit message every few seconds or if token limit reached
+                if datetime.datetime.now() >= next_edit_time or len(message_content) >= CHUNK_SIZE:
+                    await message_obj.edit(content="".join(message_content))
                     next_edit_time = datetime.datetime.now() + datetime.timedelta(seconds=1)
 
-                # Edit message periodically (throttled)
-                if datetime.datetime.now() >= next_edit_time:
-                    # Re-calculate visual buffer for the edit (it might be empty after a split)
-                    text_part = "".join(current_text_buffer)
-                    visual_buffer = text_part
-
-                    if visual_buffer:
-                        await message_obj.edit(content=visual_buffer)
-                    next_edit_time = datetime.datetime.now() + datetime.timedelta(seconds=1)
-
-        # Final edit for the last message
-        text_part = "".join(current_text_buffer)
-        visual_buffer = text_part
-
-        await message_obj.edit(content=visual_buffer or "BLANK")
-
-        return "".join(full_response_text)
+        if message_content:
+            await message_obj.edit(content="".join(message_content))
+            return "".join(message_content)
+        else:
+            return "..come again?"
 
     async def on_ready(self):
         core.log("discord", "logged in.")
@@ -150,7 +112,8 @@ class Client(discord.Client):
                     try:
                         if self.ai_channel.config.get("use_message_streaming"):
                             response_obj = self.ai_channel.format_stream_for_text(
-                                self.ai_channel.send_stream({"role": "user", "content": content})
+                                self.ai_channel.send_stream({"role": "user", "content": content}),
+                                chunk_size=CHUNK_SIZE
                             )
                             response_content = await self._stream_to_discord(response_obj, message.channel)
                         else:
@@ -159,8 +122,7 @@ class Client(discord.Client):
                             if response_obj:
                                 response_content = response_obj.get("content")
 
-                                chunk_size = 1900
-                                chunks = [response_content[i:i + chunk_size] for i in range(0, len(response_content), chunk_size)]
+                                chunks = [response_content[i:i + CHUNK_SIZE] for i in range(0, len(response_content), CHUNK_SIZE)]
 
                                 for chunk in chunks:
                                     await message.channel.send(chunk, mention_author=self.ai_channel.config.get("use_replies"))
@@ -193,8 +155,7 @@ class Discord(core.channel.Channel):
         content = message.get("content")
 
         # split the content into chunk sizes that discord accepts
-        chunk_size = 1900
-        chunks = [content[i:i + chunk_size] for i in range(0, len(content), chunk_size)]
+        chunks = [content[i:i + CHUNK_SIZE] for i in range(0, len(content), CHUNK_SIZE)]
 
         for guild in self._client.guilds:
             for channel in guild.channels:

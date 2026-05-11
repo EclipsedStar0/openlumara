@@ -6,6 +6,7 @@ import time
 import json
 import asyncio
 import json_repair
+import re
 
 class Channel:
     """Base class for channels"""
@@ -464,41 +465,69 @@ class Channel:
             return f"\n**Calling tool: {name}**\n"
 
         # 2. Try parsing JSON for key-value formatting
+        data = {}
         try:
-            data = json_repair.loads(args_str)
-            if isinstance(data, dict):
-                for key, value in data.items():
-                    val_str = str(value)
-                    prev_val = self._tool_state["keys_state"].get(key)
-
-                    if prev_val is None:
-                        # New key: append header and current value
-                        delta += f"\n**{key}**: "
-                        if val_str:
-                            delta += val_str
-                        self._tool_state["keys_state"][key] = val_str
-                    elif val_str != prev_val:
-                        # Existing key: append only the new part of the value
-                        if val_str.startswith(prev_val):
-                            delta += val_str[len(prev_val):]
-                        else:
-                            delta += val_str
-                        self._tool_state["keys_state"][key] = val_str
-
-                self._tool_state["raw_args"] = args_str
-                return delta
-            raise ValueError()
+            # Try the fast/easy way first: full parse
+            parsed = json_repair.loads(args_str)
+            if isinstance(parsed, dict):
+                data = parsed
         except Exception:
-            # 3. Fallback: Raw string delta (handles partial or "new-only" deltas)
-            prev_raw = self._tool_state["raw_args"]
-            if args_str.startswith(prev_raw):
-                delta = args_str[len(prev_raw):]
-            else:
-                delta = args_str
-            self._tool_state["raw_args"] = args_str
-            return delta
+            # Fallback to robust partial parsing if json_repair fails to produce a dict
+            # This mimics the WebUI's ability to extract keys even from incomplete JSON
+            key_pattern = re.compile(r'"([^"\\]*(?:\\.[^"\\]*)*)"\s*:\s*')
+            matches = list(key_pattern.finditer(args_str))
+            
+            for i, match in enumerate(matches):
+                key = match.group(1)
+                value_start = match.end()
+                
+                # Determine the end of the value
+                if i + 1 < len(matches):
+                    next_match_start = matches[i+1].start()
+                    potential_value_str = args_str[value_start:next_match_start].rstrip().rstrip(',')
+                else:
+                    potential_value_str = args_str[value_start:]
+                
+                # Use json_repair to try and get the value by wrapping it in a dict
+                try:
+                    repaired = json_repair.loads(f'{{"v": {potential_value_str}}}')
+                    if isinstance(repaired, dict) and "v" in repaired:
+                        data[key] = repaired["v"]
+                    else:
+                        data[key] = potential_value_str
+                except Exception:
+                    data[key] = potential_value_str
 
-    async def format_stream_for_text(self, stream):
+        # 3. Generate the delta based on the current (potentially partial) data
+        for key, value in data.items():
+            # Convert value to string for comparison and display
+            if isinstance(value, (dict, list)):
+                val_str = json.dumps(value)
+            else:
+                val_str = str(value)
+            
+            prev_val = self._tool_state["keys_state"].get(key)
+
+            if prev_val is None:
+                # New key: append header and current value
+                delta += f"\n**{key}**: "
+                if val_str:
+                    delta += val_str
+                self._tool_state["keys_state"][key] = val_str
+            elif val_str != prev_val:
+                # Existing key: append only the new part of the value
+                if val_str.startswith(prev_val):
+                    delta += val_str[len(prev_val):]
+                else:
+                    # If the value changed completely, just append the new value.
+                    # This is a fallback for delta channels.
+                    delta += val_str
+                self._tool_state["keys_state"][key] = val_str
+
+        self._tool_state["raw_args"] = args_str
+        return delta
+
+    async def format_stream_for_text(self, stream, chunk_size=None):
         """
         helper function so that channels don't need to implement this themselves...
         takes care of properly displaying all the agentic turns
@@ -509,13 +538,40 @@ class Channel:
 
         currently_reasoning = False
         show_reasoning = self.config.get("show_reasoning")
+        last_token_was_newline = False
+        token_counter = 0
+
         async for token in stream:
             token_type = token.get("type")
             content = token.get("content", "")
 
+            # # collapse consecutive newlines
+            try:
+                # collapse more than 2 newlines to just 2
+                content = re.sub(r'\n{3,}', '\n\n', content)
+
+                # format the reasoning to look all fancy
+                newline_str = "\n" if not currently_reasoning else "\n > "
+                content = content.replace("\n", newline_str)
+            except:
+                pass
+
+            # ensure formatting displays correctly even when split into chunks
+            if chunk_size and token_counter >= chunk_size:
+                if currently_reasoning:
+                    yield text_to_token("> ")
+                token_counter = 0
+
+            # f token_type in ("content", "reasoning") and content == "\n":
+            #     if last_token_was_newline:
+            #         last_token_was_newline = False
+            #         continue
+            #     else:
+            #         last_token_was_newline = True
+
             if token_type == "reasoning" and not currently_reasoning:
                 if show_reasoning:
-                    yield text_to_token("\n\n**Reasoning:**\n")
+                    yield text_to_token("\n\n**Reasoning:**\n> ")
                     currently_reasoning = True
                 else:
                     yield text_to_token("thinking..\n")
@@ -541,6 +597,8 @@ class Channel:
                 yield text_to_token(content)
             if token_type == "reasoning" and show_reasoning:
                 yield text_to_token(content)
+
+            token_counter += 1
 
     async def on_push(self, message: dict):
         raise NotImplementedError
