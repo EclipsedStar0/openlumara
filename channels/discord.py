@@ -174,7 +174,11 @@ class Discord(core.channel.Channel):
 
         for guild in self._client.guilds:
             for channel in guild.channels:
-                if isinstance(channel, discord.TextChannel) and channel.permissions_for(guild.me).view_channel:
+                if isinstance(channel, discord.TextChannel) and
+                (
+                    channel.permissions_for(guild.me).view_channel and
+                    channel.permissions_for(guild.me).send_message
+                ):
                     for chunk in chunks:
                         await channel.send(chunk)
                         await asyncio.sleep(0.5)
