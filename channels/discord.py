@@ -174,8 +174,7 @@ class Discord(core.channel.Channel):
 
         for guild in self._client.guilds:
             for channel in guild.channels:
-                if isinstance(channel, discord.TextChannel) and
-                (
+                if isinstance(channel, discord.TextChannel) and (
                     channel.permissions_for(guild.me).view_channel and
                     channel.permissions_for(guild.me).send_message
                 ):
