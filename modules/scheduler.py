@@ -465,6 +465,9 @@ class Scheduler(core.module.Module):
         weekdays_only: bool = False,
         recurring: bool = False
     ):
+        if recurring and not self.config.get("allow_recurring_jobs"):
+            return self.result("Error: Recurring scheduler jobs are disabled by security policy. Please inform the user.", success=False)
+
         index = self._get_index(id)
         if index == -1:
             return self.result("id does not exist", False)
