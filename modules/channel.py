@@ -4,6 +4,10 @@ class Channel(core.module.Module):
     """Inserts channel-specific instructions and prompts into your chats"""
 
     settings = {
+        # "enable_new_user_reminder": {
+        #     "description": "This is what makes your AI nag you about checking out the module settings. Turn this off (instead of the entire module) if you want to still be able to ask your AI about how to use openlumara, but without being nagged all the time.. lol",
+        #     "default": True
+        # },
         "enable_tutorial_prompts": {
             "description": "Whether to insert channel instructions into the system prompt so that your AI can guide you when you're new to OpenLumara. You'll want to turn this off once you're used to openlumara, to save tokens.",
             "default": True
@@ -15,7 +19,7 @@ class Channel(core.module.Module):
             Type `/help` for help. Type `/restart` to restart openlumara. Discord bot can tell who is talking to it if the `enable group chat` setting is turned on, and can show reasoning/thinking if the `show reasoning` setting is turned on.
         """,
         "cli": """
-        Type `/help` for help. `/stop` is not available in the CLI. CLI channel uses python's prompt_toolkit library, and supports common readline keyboard shortcuts. User can use arrow up/down to navigate typing history.
+        Type `/help` for help. CLI channel uses python's prompt_toolkit library, and supports common readline keyboard shortcuts. User can use arrow up/down to navigate typing history.
         """,
         "webui":
         """
@@ -54,17 +58,22 @@ class Channel(core.module.Module):
     async def on_system_prompt(self):
         output = []
 
+        # if self.config.get("enable_new_user_reminder"):
+        #
         if not self.channel or await self.channel.context.chat.get_data("character"):
             return None
 
         chan = core.modules.get_name(self.channel)
-        if self.config.get("enable_tutorial_prompts") and chan in self.instructions:
-            output.append(self.instructions.get(chan))
 
         if chan in ("cli", "matrix"):
             output.append(f"While in the {chan} channel, **DO NOT USE MARKDOWN**.")
 
         output.append("\nNOTE: if the channel has changed, discard instructions about previous channels.")
+
+        if self.config.get("enable_tutorial_prompts") and chan in self.instructions:
+            output.append("")
+            output.append("Instructions for the user:")
+            output.append(self.instructions.get(chan).strip())
 
         return "\n".join(output)
 

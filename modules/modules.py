@@ -1,40 +1,33 @@
 import core
 
 class Modules(core.module.Module):
-    """Lets your AI turn modules on/off. Caution! This can be bad for security."""
+    """Helps your AI manage your modules"""
 
-    unsafe = True
+    settings = {
+        "allow_ai_to_toggle": {
+            "description": "Allow your AI to enable/disable modules for you. WARNING: very insecure and unsafe when used in public instances! Only use for private instances, and even then, keep the dangers of prompt injection in mind.",
+            "default": False,
+            "unsafe": True
+        },
+        "insert_system_prompt": {
+            "description": "Whether to insert the list of enabled/disabled modules into the system prompt. Will make the AI aware of what modules are enabled/disabled at all times.",
+            "default": True
+        }
+    }
 
     async def on_system_prompt(self):
         module_list = {
-            "enabled": ", ".join(core.config.get("modules", "enabled", [])),
-            "disabled": ", ".join(core.config.get("modules", "disabled", []))
+            "enabled": ", ".join(core.config.get("modules", "enabled", default=[])),
+            "disabled": ", ".join(core.config.get("modules", "disabled", default=[]))
         }
         return str(module_list)
 
     async def toggle(self, name: str):
-        if name.lower().strip() == "modules":
-            return "module manager can only be manually turned off by editing the config file. you need to know what you're doing!"
-
         module_name = name.lower().strip()
+        if name == "modules":
+            return "module manager can only be manually turned off by using the settings dialog, the `/module` command, or editing the config file. user needs to know what you're doing!"
 
-        is_enabled = module_name in core.config.config.get("modules", "enabled", [])
-        is_disabled = module_name in core.config.config.get("modules", "disabled", [])
-
-        if not is_enabled and not is_disabled:
-            return "module not found"
-
-        if is_enabled:
-            core.config.config["modules"]["enabled"].remove(module_name)
-            core.config.config["modules"]["disabled"].append(module_name)
+        if self.manager.toggle_module(name):
+            return self.result("Module has been toggled. Remind user to use `/restart` to apply changes")
         else:
-            core.config.config["modules"]["disabled"].remove(module_name)
-            core.config.config["modules"]["enabled"].append(module_name)
-
-        core.config.config.save()
-
-        if is_enabled:
-            return "module has been disabled. remind user to use /restart to apply changes."
-        else:
-            return "module has been enabled. remind user to use /restart to apply changes."
-
+            return self.result("That module does not exist!", success=false)

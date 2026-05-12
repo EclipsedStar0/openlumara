@@ -386,23 +386,18 @@ core:
                 if not args:
                     return "please provide a name of the module to toggle"
 
-                import modules
-                module_manager = modules.modules.Modules(self.channel.manager)
-                found = False
-                for module in modules.get_all(respect_config=False):
-                    module_name = core.modules.get_name(module)
-                    if args[0].lower().strip() == module_name:
-                        found = True
+                module_name = args[0]
+                all_modules = core.config.get("modules", "enabled", default=[]) + core.config.get("modules", "disabled", default=[])
 
-                if not found:
+                if module_name not in all_modules:
                     return "module with that name doesn't exist"
 
-                await module_manager.toggle(args[0])
-                await self.channel.announce("module toggled")
-                await self.channel.announce("restarting to apply module change..", "error")
-                await asyncio.sleep(0.2)
+                await self.channel.manager.toggle_module(module_name)
+                await self.channel.push("restarting to apply module change..")
+                await asyncio.sleep(0.1)
                 await self.channel.manager.restart()
-                return
+
+                return "module toggled"
             case "tools":
                 if not core.config.get("model").get("use_tools", False):
                     return "tools are turned off"

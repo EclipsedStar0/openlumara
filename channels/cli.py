@@ -143,8 +143,8 @@ class Cli(core.channel.Channel):
 
         return True
 
-    async def on_message(self, message: dict):
-        core.log("debug", message)
+    async def on_push(self, message: dict):
+        core.log("push", message.get("content").strip())
         print(flush=True)
 
     async def _process_message(self, msg):

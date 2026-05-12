@@ -49,12 +49,14 @@ class Module:
     # can be defined by modules, contains default settings that can be changed by the user
     settings = {}
 
+    # unsafe flag can mark a module as risky to enable in supported settings UI's
+    unsafe = False
+
     def __init__(self, manager, is_user_module=False, channel=None):
         self.manager = manager
         self.channel = channel # later set by the channel base class, _set_as_active_channel()
         self.name = core.modules.get_name(self) # shorthand alias
         self.disabled_tools = [] # gets scanned when adding tools from the module. you can alter this in a module's __init__() to selectively disable tools.
-        self.unsafe = False # unsafe flag for special display of unsafe modules in UI's
 
         # load module config
         config_target = "modules" if not is_user_module else "user_modules"

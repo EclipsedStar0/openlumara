@@ -210,6 +210,30 @@ class Manager:
 
         core.log("core", "Shutdown complete")
 
+    async def toggle_module(self, module_name: str, autorestart=True):
+        modules = core.config.config["modules"]
+        enabled = modules["enabled"]
+        disabled = modules["disabled"]
+
+        if module_name in enabled:
+            enabled.remove(module_name)
+            disabled.append(module_name)
+        elif module_name in disabled:
+            disabled.remove(module_name)
+            enabled.append(module_name)
+        else:
+            return False
+
+        core.config.config.save()
+
+        if autorestart:
+            if self.channel:
+                await self.channel.push("restarting to apply module change..")
+            await asyncio.sleep(0.1)
+            await self.channel.manager.restart()
+
+        return True
+
     async def _initialize_api_connection(self):
         """Initialize API connection with user-friendly error handling."""
         core.log("API", "Connecting to AI..")

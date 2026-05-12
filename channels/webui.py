@@ -1260,24 +1260,16 @@ def save_settings():
 @app.route("/settings/get_module_info")
 def get_module_info():
     module_info = {}
-    import modules
-    import user_modules
-
-    # Load modules, user_modules, AND channels so we can get descriptions for all
-    loaded_classes = core.modules.load(modules, core.module.Module) + core.modules.load(user_modules, core.module.Module)
-
-    for cls in loaded_classes:
-        module_name = core.modules.get_name(cls)
-        docstring = str(cls.__doc__).strip() if cls.__doc__ else None
-        is_unsafe = getattr(cls, 'unsafe', False)
+    for module_name, module_data in core.config.get_module_structure().items():
+        metadata = module_data.get("metadata", {})
 
         # Get the settings structure (the one with 'default' and 'description')
-        settings_schema = getattr(cls, 'settings', {})
+        settings_schema = module_data.get("settings", {})
 
         if module_name not in module_info.keys():
             module_info[module_name] = {
-                "description": docstring,
-                "unsafe": is_unsafe,
+                "description": metadata.get("doc", ""),
+                "unsafe": metadata.get("unsafe", False),
                 "settings_schema": settings_schema
             }
 
