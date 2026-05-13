@@ -210,8 +210,7 @@ core:
 /context full               show full context being sent to AI
 /context raw                show full context as raw JSON
 /status                     show status info
-/config set <path> <value>  Example: /config set api url http://localhost:5001/v1
-/config get <path>          Example: /config get api url
+/config                     Explore, view, and set config settings
 /restart                    restarts the server
 /stop                       stops the AI in it's tracks
 /connect                    attempt to connect to the API
