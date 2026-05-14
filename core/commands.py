@@ -73,8 +73,12 @@ def get_commands(modules_dict: dict = None):
 
 
             # If this module has any commands, add them to the output
-            if module_cmds and module_name not in commands:
-                commands[module_name] = module_cmds
+            if module_cmds and module_name:
+                if module_name not in commands:
+                    commands[module_name] = {}
+
+                # we use update() so that core command categories can be extended by modules
+                commands[module_name].update(module_cmds)
 
     return commands
 
