@@ -11,6 +11,7 @@ jinja2
 itsdangerous
 fastapi
 uvicorn
+websockets
 beautifulsoup4
 discord.py
 python-telegram-bot
