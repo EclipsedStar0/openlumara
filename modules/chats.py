@@ -87,7 +87,7 @@ class Chats(core.module.Module):
         context = await self.manager.channel.context.get()
 
         # use API.send() to skip all the usual convenience logic
-        response = await self.manager.API.send(context+[{"role": "user", "content": "Please summarize our conversation so far up to this point. The purpose is to compress current context into a new one that will be used in a new chat."}], use_tools=False, use_thinking=False)
+        response = await self.manager.API.send(context+[{"role": "user", "content": "Please summarize our conversation so far up to this point. The purpose is to compress current context into a summary that will be used to continue the chat."}], use_tools=False, use_thinking=False)
 
         if not response:
             return None
