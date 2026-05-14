@@ -62,7 +62,7 @@ class APIClient():
         if self.connected:
             return True
 
-        self._model = core.config.get("model", {}).get("name")
+        self._model = core.config.get("model", "name")
         self._connection_attempts += 1
         api_config = core.config.get("api", {})
 

@@ -27,20 +27,7 @@ class Chat:
         self.current_save_path = os.path.join(core.get_data_path(), f"{self.channel.name}_current_chat")
         self.using_api_token_data = False # gets instantly set to True upon first receive of token usage data
         self.token_encoding = None
-
-        # initialize token encoding
-        model_name = None
-        if hasattr(self.channel, 'manager') and hasattr(self.channel.manager, 'API'):
-            model_name = self.channel.manager.API._model
-
-        try:
-            self.token_encoding = tiktoken.encoding_for_model(model_name)
-        except KeyError:
-            self.token_encoding = tiktoken.get_encoding("cl100k_base")
-        except:
-            # If tiktoken fails to load (e.g. no internet and no cache), we set to None
-            # count_tokens will handle the fallback
-            pass
+        self.model_name = None
 
         for index in range(len(self.data) - 1, -1, -1):
             chat = self.data[index]
@@ -385,6 +372,23 @@ class Chat:
         _messages = messages or await self.channel.context.get(system_prompt=True, end_prompt=True)
         if not _messages:
             return 0
+
+        # only set the tiktoken encoder if the model changed
+        # model name changes when connecting for the first time
+        # or when swapping models
+        model_name = self.channel.manager.API.get_model()
+        if model_name != self.model_name:
+            self.model_name = model_name
+
+            try:
+                self.token_encoding = tiktoken.encoding_for_model(model_name)
+            except KeyError:
+                self.token_encoding = tiktoken.get_encoding("cl100k_base")
+            except Exception as e:
+                # If tiktoken fails to load (e.g. no internet and no cache), we set to None
+                # _count_text_tokens then uses a character-based fallback
+                self.token_encoding = None
+                pass
 
         for message in _messages:
             # Conservative token counting:
