@@ -17,7 +17,7 @@ Ask the user if they need any help with setting up openlumara. If user says yes,
             disable_instr += " or through the WebUI's settings dialog, in the Modules section"
 
         output.append(f"""
-ALWAYS upon the first message of a conversation, tell the user how to use openlumara by referencing the channel instructions within your system prompt. Present the information in a user-friendly, easy to understand way. Ensure you mention **ALL** information contained within the channel instructions.
+ALWAYS upon the first message of a conversation, tell the user how to use openlumara by referencing the channel instructions within your system prompt. Present the information in a user-friendly, easy to understand way.
 
 The `docs` module is active by default and gives you access to documentation to answer any questions the user might have about openlumara! If user asks any questions about openlumara that are not covered by this prompt, use the docs module to get documentation about it. For module-specific questions, use modules_get_help instead.
 
