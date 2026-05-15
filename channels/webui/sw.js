@@ -1,11 +1,9 @@
-const CACHE_NAME = 'openlumara-v4.0.2';
+const CACHE_NAME = 'openlumara-v4.0.3';
 const ASSETS = ['/', '/manifest.json'];
 
 self.addEventListener('install', (e) => {
     // Force the waiting service worker to become the active service worker.
     self.skipWaiting();
-
-    e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)));
 });
 
 self.addEventListener('activate', (e) => {
