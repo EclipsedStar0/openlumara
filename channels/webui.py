@@ -945,6 +945,8 @@ async def new_chat(request: Request, user: str = Depends(require_auth)):
 
 @app.post("/chat/clear")
 async def clear_chat(user: str = Depends(require_auth)):
+    global channel_instance
+
     await channel_instance.context.chat.clear()
     return {"success": True}
 

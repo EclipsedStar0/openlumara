@@ -1415,6 +1415,7 @@ async function clearChat() {
             // Reload
             if (currentChatId) {
                 await loadChat(currentChatId);
+                syncMessages();
             }
             await loadChats();
         }

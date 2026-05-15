@@ -53,11 +53,6 @@ document.addEventListener('keydown', (event) => {
             send();
             return;
         }
-        if (event.key === 'l' || event.key === 'L') {
-            event.preventDefault();
-            clearChat();
-            return;
-        }
         if (event.key === 's' || event.key === 'S') {
             event.preventDefault();
             toggleModal('settings');
