@@ -4,6 +4,7 @@ quiet = False
 debug = False
 
 from core.functions import *
+import core.exceptions
 import core.config
 import core.storage
 import core.module

@@ -55,7 +55,10 @@ def load(package, base_class = None, filter: list = None, reload: bool = False):
                     continue
 
                 discovered.append(target_class)
-
+        except core.exceptions.DependencyMissing as e:
+            # silence these warnings for now
+            # need a better way to deal with missing dependencies
+            pass
         except Exception as e:
             # Catching Exception prevents the program from crashing on faulty modules.
             # We simply log the warning and continue to the next module.
