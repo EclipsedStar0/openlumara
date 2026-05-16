@@ -323,6 +323,9 @@ class Chat:
         if self.current is None:
             await self.new()
 
+        if index is None:
+            index = -1
+
         self.data[self.current]["messages"].pop(index)
         index = len(self.data[self.current]["messages"]) - 1
         await self.save()
