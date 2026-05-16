@@ -255,7 +255,7 @@ class Discord(core.channel.Channel):
         chunks = [content[i:i + MAX_CHARS] for i in range(0, len(content), MAX_CHARS)]
 
         # send into the channel if we have the permissions to
-        channel = self._client.fetch_channel(target_channel_id)
+        channel = await self._client.fetch_channel(target_channel_id)
         if isinstance(channel, discord.TextChannel):
             if (
                 channel.permissions_for(guild.me).view_channel and
