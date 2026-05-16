@@ -7,6 +7,8 @@ import json_repair
 MAX_CHARS = 1900
 
 class Client(discord.Client):
+    public_commands = ("new", "clear", "status", "stop")
+
     def __init__(self, channel, **kwargs):
         super(Client, self).__init__(**kwargs)
         self.ai_channel = channel
@@ -96,8 +98,6 @@ class Client(discord.Client):
         if message.author == self.user:
             return
 
-        self._channel = message.channel
-
         if message.channel.id != int(self.ai_channel.config.get("target_channel_id")):
             return
 
@@ -117,22 +117,25 @@ class Client(discord.Client):
 
                 async with message.channel.typing():
                     try:
-                        content = message.content.strip()
                         # remove mentions from message before sending
+                        content = message.content.strip()
                         for mention in message.raw_mentions:
-                           content = content.replace(str(mention), "")
-                           content = content.replace("<@>", "")
-                           content = content.strip()
+                            content = content.replace(str(mention), "")
+                            content = content.replace("<@>", "")
+                            content = content.strip()
 
                         cmd_prefix = core.config.get("core").get("cmd_prefix", "/")
                         is_cmd = content.lower().startswith(cmd_prefix.lower())
+                        try:
+                            cmd = content.split(cmd_prefix)[-1]
+                        except:
+                            return await message.channel.send("Error while splitting command prefix.. somehow")
 
                         if is_cmd:
-                            # only allow authorised user to use commands
-                            authorised_id = int(self.ai_channel.config.get("authorised_user_id"))
-
-                            if message.author.id != authorised_id:
-                                return await message.channel.send("Only the bot owner is allowed to use commands!")
+                            if cmd not in self.public_commands:
+                                authorised_id = self.ai_channel.config.get("authorised_user_id")
+                                if authorised_id and message.author.id != int(authorised_id):
+                                    return await message.channel.send("Only the bot owner is allowed to use commands!")
                         else:
                             orig_content = str(content)
                             content = ""
@@ -145,7 +148,8 @@ class Client(discord.Client):
                                 replied_message = await message.channel.fetch_message(message.reference.message_id)
 
                                 # format it like a reply
-                                replied_message_formatted = "> "+"\n> ".join(replied_message.content.split("\n"))
+                                replied_content = replied_message.content or ""
+                                replied_message_formatted = "> "+"\n> ".join(replied_content.split("\n"))
                                 content += f"in reply to:\n{replied_message_formatted}\n\n"
 
                             # if group chat is enabled, make the AI aware of who is speaking
@@ -241,22 +245,28 @@ class Discord(core.channel.Channel):
         if message.get("role") != "assistant":
             return None
 
-        content = message.get("content")
+        target_channel_id = self.config.get("target_channel_id")
+        if not target_channel_id:
+            core.log(self.name, "Error while sending push message: No target channel ID set. Could not send message! Please configure your target channel.")
+            return
 
         # split the content into chunk sizes that discord accepts
+        content = message.get("content")
         chunks = [content[i:i + MAX_CHARS] for i in range(0, len(content), MAX_CHARS)]
 
-        for guild in self._client.guilds:
-            for channel in guild.channels:
-                if isinstance(channel, discord.TextChannel) and (
-                    channel.id == int(self.config.get("target_channel_id")) and (
-                        channel.permissions_for(guild.me).view_channel and
-                        channel.permissions_for(guild.me).send_messages
-                    )
-                ):
-                    for chunk in chunks:
-                        await channel.send(chunk)
-                        await asyncio.sleep(0.5)
+        # send into the channel if we have the permissions to
+        channel = self._client.fetch_channel(target_channel_id)
+        if isinstance(channel, discord.TextChannel):
+            if (
+                channel.permissions_for(guild.me).view_channel and
+                channel.permissions_for(guild.me).send_messages
+            ):
+                for chunk in chunks:
+                    await channel.send(chunk)
+                    await asyncio.sleep(0.5)
+            else:
+                core.log(self.name, "Error while sending push message: Discord bot does not have the required permissions to send messages into the target channel. Please give it the needed permissions!")
+                return
 
     async def run(self):
         token = core.config.config.get("channels").get("settings").get("discord").get("token")
