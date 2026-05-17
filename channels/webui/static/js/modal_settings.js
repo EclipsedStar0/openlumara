@@ -2628,7 +2628,8 @@ function createThemeSection() {
         return !!localStorage.getItem(`${id}SoundData`);
     };
 
-    const createSoundInput = (id, labelText, iconPath, savedName) => {
+    const createSoundInput = (id, labelText, iconPath) => {
+        const savedName = localStorage.getItem(`${id}SoundName`);
         const hasAudio = isAudioLoaded(id);
         const isEnabled = localStorage.getItem(`${id}Enabled`) !== 'false'; // Default to true
 
@@ -2673,7 +2674,7 @@ function createThemeSection() {
         </svg>
         </button>
         </div>
-        <input type="file" accept="audio/*" id="${id}-file-input" style="display: none;">
+        <input type="file" accept="audio/*" id="${id}-file-input" style="position: absolute; left: -9999px; top: auto; width: 1px; height: 1px; overflow: hidden;">
         `;
 
         const previewBtn = container.querySelector(`#${id}-preview-btn`);
@@ -2760,8 +2761,7 @@ function createThemeSection() {
     const sendSoundInput = createSoundInput(
         'send_message',
         'Send Message Sound',
-        sendIcon,
-        localStorage.getItem("sendMessageSoundName")
+        sendIcon
     );
     soundContainer.appendChild(sendSoundInput);
 
@@ -2770,24 +2770,21 @@ function createThemeSection() {
     const responseSoundInput = createSoundInput(
         'response_start',
         'Response Start Sound',
-        responseIcon,
-        localStorage.getItem("responseStartSoundName")
+        responseIcon
     );
     soundContainer.appendChild(responseSoundInput);
 
     const tokenSoundInput = createSoundInput(
         'token',
         'Token Generation Sound',
-        typewriterIcon,
-        localStorage.getItem("tokenSoundName")
+        typewriterIcon
     );
     soundContainer.appendChild(tokenSoundInput);
 
     const twSoundInput = createSoundInput(
         'typing',
         'Typewriter Sound',
-        typewriterIcon,
-        localStorage.getItem("typewriterSoundName")
+        typewriterIcon
     );
     soundContainer.appendChild(twSoundInput);
 
@@ -2796,16 +2793,14 @@ function createThemeSection() {
     const reasoningSoundInput = createSoundInput(
         'reasoning_end',
         'Reasoning End Sound',
-        reasoningIcon,
-        localStorage.getItem("reasoningEndSoundName")
+        reasoningIcon
     );
     soundContainer.appendChild(reasoningSoundInput);
 
     const compSoundInput = createSoundInput(
         'completion',
         'Completion Sound',
-        completionIcon,
-        localStorage.getItem("completionSoundName")
+        completionIcon
     );
 
     soundContainer.appendChild(compSoundInput);

@@ -10,6 +10,8 @@ const TypewriterAudioManager = {
         send_message: null,
         response_start: null,
         typewriter: null,
+        typing: null,
+        token: null,
         completion: null,
         reasoning_end: null
     },
@@ -72,7 +74,7 @@ const TypewriterAudioManager = {
             });
         };
 
-        await Promise.all([load('send_message'), load('response_start'), load('typewriter'), load('completion'), load('reasoning_end')]);
+        await Promise.all([load('send_message'), load('response_start'), load('typewriter'), load('typing'), load('token'), load('completion'), load('reasoning_end')]);
     },
 
     getAudioContext: function() {
@@ -136,6 +138,28 @@ const TypewriterAudioManager = {
         }
     },
 
+    // Load and cache audio from a Data URL (base64)
+    loadFromDataURL: function(id, dataUrl) {
+        return new Promise((resolve, reject) => {
+            try {
+                // Strip data URI prefix if present (e.g., "data:audio/mp3;base64,")
+                const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+                const byteString = atob(base64);
+                const ab = new ArrayBuffer(byteString.length);
+                const ia = new Uint8Array(ab);
+                for (let i = 0; i < byteString.length; i++) {
+                    ia[i] = byteString.charCodeAt(i);
+                }
+                const buffer = this.getAudioContext().decodeAudioData(ab);
+                this.buffers[id] = buffer;
+                resolve(true);
+            } catch (err) {
+                console.error('Error decoding audio data URL:', err);
+                reject(err);
+            }
+        });
+    },
+
     // Play the sound asynchronously to avoid UI blocking
     play: function(id) {
         // Check if the specific sound type is enabled
@@ -144,7 +168,7 @@ const TypewriterAudioManager = {
         }
 
         // ── Typing suppression during reasoning chime ──
-        if (id === 'typing' && this.isReasoningPlaying) {
+        if ((id === 'typing' || id === 'typewriter') && this.isReasoningPlaying) {
             return; // Skip typing sound while reasoning chime is active
         }
 
@@ -156,10 +180,10 @@ const TypewriterAudioManager = {
             if (ctx.state === 'suspended') ctx.resume().catch(() => {});
 
             const configs = {
-                send_message:    { freq: 880,  dur: 0.25 },
+                send_message:    { freq: 440,  dur: 0.25 },
                 response_start:  { freq: 440,  dur: 0.25 },
                 reasoning_end:   { freq: 220,  dur: 0.25 },
-                completion:      { freq: 440,  dur: 0.25 }
+                completion:      { freq: 220,  dur: 0.25 }
             };
 
             const cfg = configs[id] || { freq: 440, dur: 0.2 };
@@ -174,7 +198,7 @@ const TypewriterAudioManager = {
             lpf.Q.value = 0.8; // Gentler slope, less harsh transition
 
             // ── Helper: Schedule a single sine tone with smoother attack ──
-            const playTone = (freq, startTime, attack = 0, decay = 0.01, volScale = 0.15) => {
+            const playTone = (freq, startTime, attack = 0, decay = 0.01, volScale = 0.8) => {
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
 
@@ -195,7 +219,7 @@ const TypewriterAudioManager = {
             };
 
             // ── Helper: Schedule a panned harmonic tone ──
-            const playHarmonic = (freqMultiplier, delay, volScale = 0.12, pan = -0.2) => {
+            const playHarmonic = (freqMultiplier, delay, volScale = 0.7, pan = -0.2) => {
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
                 const panner = ctx.createStereoPanner();
@@ -236,7 +260,7 @@ const TypewriterAudioManager = {
 
                 // Proper envelope with decay
                 gain.gain.setValueAtTime(0, t);
-                gain.gain.linearRampToValueAtTime(vol * 0.24, t + 0.002);
+                gain.gain.linearRampToValueAtTime(vol * 0.7, t + 0.002);
                 gain.gain.exponentialRampToValueAtTime(0.001, t + 0.010);
 
                 // Chain: osc → LPF → gain → master
@@ -253,7 +277,7 @@ const TypewriterAudioManager = {
                 const freq = typingFreq;
 
                 const osc = ctx.createOscillator();
-                osc.type = 'sine'; // blip uses sine
+                osc.type = 'sine';
                 osc.frequency.value = freq;
 
                 const gain = ctx.createGain();
@@ -268,7 +292,7 @@ const TypewriterAudioManager = {
 
                 // Envelope: 10ms attack, 100ms decay
                 // Adjusted volume to match token sound (~25%)
-                gain.gain.linearRampToValueAtTime(vol * 0.10, t + 0.01);
+                gain.gain.linearRampToValueAtTime(vol * 0.7, t + 0.01);
                 gain.gain.exponentialRampToValueAtTime(0.00001, t + 0.1);
                 osc.stop(t + 0.1);
 
@@ -277,10 +301,10 @@ const TypewriterAudioManager = {
 
             if (id === 'send_message') {
                 // First note (warm base, smooth attack)
-                playTone(300, t, 0.008, 0.06, 0.20);
+                playTone(440, t, 0.008, 0.20, 0.20);
 
                 // Second note (slightly higher, softer, clear spacing)
-                playTone(400, t + 0.08, 0.008, 0.06, 0.18);
+                playTone(220, t + 0.08, 0.008, 0.20, 0.18);
 
                 return; // ⚠️ CRITICAL
             }
@@ -289,10 +313,10 @@ const TypewriterAudioManager = {
                 // inverse of send_message
 
                 // Second note (slightly higher, softer, clear spacing)
-                playTone(400, t, 0.008, 0.06, 0.18);
+                playTone(220, t, 0.008, 0.20, 0.18);
 
                 // First note (warm base, smooth attack)
-                playTone(300, t + 0.08, 0.008, 0.06, 0.20);
+                playTone(440, t + 0.08, 0.008, 0.20, 0.20);
                 return; // ⚠️ CRITICAL
             }
 
@@ -300,11 +324,8 @@ const TypewriterAudioManager = {
                 // Warm base tone (smoother attack, resolving decay)
                 this.isReasoningPlaying = true;
 
-                // Soft fifth harmonic (wider spacing)
-                playHarmonic(1.5, 0.10, 0.06, -0.3);
-
                 // Gentle octave harmonic (clear resolution)
-                playHarmonic(2.0, 0.20, 0.04, 0.3);
+                playHarmonic(1.5, 0.05, 0.7, 0.3);
 
                 setTimeout(() => {
                     this.isReasoningPlaying = false;
@@ -312,14 +333,14 @@ const TypewriterAudioManager = {
             }
 
             // === GENERIC FALLBACK (other sounds) ===
-            playTone(cfg.freq, t, 0, cfg.dur, 0.15);
+            playTone(cfg.freq, t, 0, cfg.dur, 0.8);
 
             if (id === 'completion') {
                 // First harmonic (softer, lower interval)
-                playHarmonic(1.5, 0.10, 0.08, -0.3);
+                playHarmonic(1.5, 0.10, 0.7, -0.3);
 
                 // Second harmonic (gentle resolution)
-                playHarmonic(2.0, 0.22, 0.05, 0.3);
+                playHarmonic(2.0, 0.22, 0.6, 0.3);
             }
 
         }
@@ -348,7 +369,6 @@ const TypewriterAudioManager = {
             }
         }, 0);
     }
-
 };
 
 // Initialize on load
