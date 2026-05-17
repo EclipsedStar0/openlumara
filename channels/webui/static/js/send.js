@@ -388,7 +388,7 @@ async function send(providedContent = null) {
                                 promptProcessingReceived = true;
                                 if (typing && !fancyProcessingIndicator) {
                                     fancyProcessingIndicator = document.createElement('div');
-                                    fancyProcessingIndicator.className = 'prompt-processing-indicator-wrapper';
+                                    fancyProcessingIndicator.className = 'prompt-processing-indicator-wrapper tool-processing-content';
                                     chat.insertBefore(fancyProcessingIndicator, typing);
                                     typing.style.display = 'none';
 
@@ -410,6 +410,7 @@ async function send(providedContent = null) {
                                     progressTextPercent = fancyProcessingIndicator.querySelector('.prompt-processing-percent');
                                     progressTextETA = fancyProcessingIndicator.querySelector('.prompt-processing-eta');
 
+                                    TypewriterAudioManager.playProcessingSound();
                                     scrollToBottom();
                                 }
                             }
@@ -481,6 +482,7 @@ async function send(providedContent = null) {
                             streamStarted = true;
 
                             // Play response start sound
+                            TypewriterAudioManager.stopProcessingSound();
                             TypewriterAudioManager.play('response_start');
 
                             // Hide fancy indicator and restore typing indicator
@@ -494,6 +496,7 @@ async function send(providedContent = null) {
                         if (token) {
                             // Clear processing indicators when content starts
                             clearProcessingIndicators();
+                            TypewriterAudioManager.stopProcessingSound();
 
                             appendStreamText('content', token, useTypewriter);
                             if (useTypewriter) {
@@ -525,6 +528,7 @@ async function send(providedContent = null) {
                                 streamStarted = true;
 
                                 // Play response start sound
+                                TypewriterAudioManager.stopProcessingSound();
                                 TypewriterAudioManager.play('response_start');
 
                                 // Hide fancy indicator and restore typing indicator

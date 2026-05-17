@@ -257,9 +257,9 @@ const TypewriterAudioManager = {
 
                 // smooth exponential envelope with safe UI volume
                 gain.gain.setValueAtTime(0, t);
-                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.003);
-                gain.gain.exponentialRampToValueAtTime(0.15, t + 0.005);   // peak volume
-                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.080);  // smooth fade out
+                gain.gain.exponentialRampToValueAtTime(0.0005, t + 0.003);
+                gain.gain.exponentialRampToValueAtTime(0.005, t + 0.005);   // peak volume
+                gain.gain.exponentialRampToValueAtTime(0.0005, t + 0.080);  // smooth fade out
 
 
                 osc1.connect(gain);
@@ -372,7 +372,80 @@ const TypewriterAudioManager = {
                 console.warn('Error playing sound:', e);
             }
         }, 0);
-    }
+    },
+
+
+    playProcessingSound: function() {
+        if (localStorage.getItem(`processingEnabled`) !== 'true') {
+            return;
+        }
+
+        const buffer = this.buffers['processing'];
+
+        if (!buffer) {
+            if (this.processingSound) this.stopProcessingSound();
+            const ctx = this.getAudioContext();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            const lpf = ctx.createBiquadFilter();
+            const convolver = ctx.createConvolver();
+            const lfo = ctx.createOscillator();
+            const lfoGain = ctx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.value = 150;
+
+            lpf.type = 'lowpass';
+            lpf.frequency.value = 900;
+
+            // Generate a quick 1.5s reverb tail
+            const rate = ctx.sampleRate;
+            const length = rate * 1.5;
+            const impulse = ctx.createBuffer(2, length, rate);
+            const dataL = impulse.getChannelData(0);
+            const dataR = impulse.getChannelData(1);
+            for (let i = 0; i < length; i++) {
+                const decay = Math.pow(1 - i / length, 3);
+                dataL[i] = (Math.random() * 2 - 1) * decay;
+                dataR[i] = (Math.random() * 2 - 1) * decay;
+            }
+            convolver.buffer = impulse;
+
+            gain.gain.value = 0;
+            gain.gain.linearRampToValueAtTime(0.04, ctx.currentTime + 0.3);
+
+            lfo.frequency.value = 0.4;
+            lfoGain.gain.value = 0.02;
+
+            lfo.connect(lfoGain);
+            lfoGain.connect(gain.gain);
+            lfo.start();
+
+            // Chain: osc -> lpf -> convolver -> gain -> master
+            osc.connect(lpf);
+            lpf.connect(convolver);
+            convolver.connect(gain);
+            gain.connect(this.masterGainNode);
+            osc.start();
+
+            this.processingSound = {
+                stop: () => {
+                    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.5);
+                    setTimeout(() => { osc.stop(); lfo.stop(); }, 500);
+                    this.processingSound = null;
+                }
+            };
+        }
+    },
+
+
+
+
+    stopProcessingSound: function() {
+        if (this.processingSound) {
+            this.processingSound.stop();
+        }
+    },
 };
 
 // Initialize on load

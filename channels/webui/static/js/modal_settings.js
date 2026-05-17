@@ -2698,6 +2698,8 @@ function createThemeSection() {
                         console.warn('Failed to preload audio:', err);
                     }
                 }, 0);
+                previewBtn.disabled = false;
+                clearBtn.disabled = false;
             }
         }
 
@@ -2769,6 +2771,13 @@ function createThemeSection() {
         typewriterIcon
     );
     soundContainer.appendChild(responseSoundInput);
+
+    const processingSoundInput = createSoundInput(
+        'processing',
+        'Prompt processing',
+        typewriterIcon
+    );
+    soundContainer.appendChild(processingSoundInput);
 
     const tokenSoundInput = createSoundInput(
         'token',
