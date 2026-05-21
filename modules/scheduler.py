@@ -298,6 +298,11 @@ class Scheduler(core.module.Module):
             )
         }
 
+        instruction_message_pure = {
+            "role": "system",
+            "content": action
+        }
+
         # Retry loop with exponential backoff
         max_retries = 10
         base_delay = 5  # seconds
@@ -311,7 +316,9 @@ class Scheduler(core.module.Module):
                 private_messages = list(base_messages) + [instruction_message]
 
                 # allow a choice between sending full context or sending only the instruction
-                final_messages = private_messages if self.config.get("prompt_strategy") == "send full context" else [instruction_message]
+                final_messages = [instruction_message_pure] if use_token_efficient else private_messages
+
+                print(final_messages)
 
                 response = await self.manager.API.send(
                     final_messages,
