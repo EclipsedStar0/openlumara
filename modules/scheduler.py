@@ -13,6 +13,14 @@ class Scheduler(core.module.Module):
             "description": "Whether to insert a list of all currently scheduled jobs in the system prompt. This will make your AI aware of upcoming scheduled jobs at all times!",
             "default": True
         },
+        "prompt_strategy": {
+            "type": "select",
+            "default": "minimize tokens",
+            "options": {
+                "minimize tokens": "Token-efficient, sends only the scheduled instruction. Drastically reduces token use and cost, but may induce prompt reprocessing due to context switching.",
+                "send full context": "Sends the entire context window + the scheduled instruction. This makes many API's use the prompt cache to prevent reprocessing, but it will also send your entire history along with the scheduled instructions, which is a lot of tokens."
+            }
+        },
         "allow_recurring_jobs": True
     }
 
@@ -270,10 +278,18 @@ class Scheduler(core.module.Module):
             if not t.get("function", {}).get("name", "").startswith("scheduler_")
         ]
 
+        use_token_efficient = True
+        if self.config.get("prompt_strategy") == "send full context":
+            use_token_efficient = False
+
+        instr_role = "system"
+        if not use_token_efficient:
+            instr_role = "developer" if job_channel.manager.API.supports_developer_role else "user"
+
         action = job.get("action")
 
         instruction_message = {
-            "role": "developer" if job_channel.manager.API.supports_developer_role else "user",
+            "role": instr_role,
             "content": (
                 "[AUTOMATED SYSTEM INSTRUCTION]\n"
                 "Please follow these instructions:\n\n"
@@ -293,6 +309,9 @@ class Scheduler(core.module.Module):
                 # Build a fresh private copy each attempt (context may have changed)
                 base_messages = await job_channel.context.get(end_prompt=False)
                 private_messages = list(base_messages) + [instruction_message]
+
+                # allow a choice between sending full context or sending only the instruction
+                final_messages = private_messages if self.config.get("prompt_strategy") == "send full context" else [instruction_message]
 
                 response = await self.manager.API.send(
                     private_messages,
