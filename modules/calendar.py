@@ -3,6 +3,12 @@ import datetime
 import ulid
 import asyncio
 
+structure = core.config.get_module_structure()
+channels = []
+for name, data in structure.items():
+    if data.get("metadata", {}).get("type") == "channel":
+        channels.append(name)
+
 class Calendar(core.module.Module):
     """Lets your AI manage a calendar for you"""
 
@@ -26,7 +32,7 @@ class Calendar(core.module.Module):
             "type": "select",
             "default": "telegram",
             "description": "Which channel to send calendar notifications to",
-            "options": {name: "" for name in core.config.get("channels", "enabled", [])}
+            "options": {name: f"Send notifications via {name}" for name in channels}
         },
         "notification_window": {
             "description": "Amount of minutes in advance you should be notified. You can set this to 0 to be notified at the time of the event.",
