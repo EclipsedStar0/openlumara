@@ -96,7 +96,6 @@ function handleWebSocketMessage(data) {
 function handleNewMessage(msg) {
     // Skip if we're currently streaming - messages will be synced after streaming completes
     if (typeof isStreaming !== 'undefined' && isStreaming) {
-        console.log('Skipping WebSocket message during streaming, will sync after');
         return;
     }
     

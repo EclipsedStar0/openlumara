@@ -683,13 +683,14 @@ class Channel:
             # if add_to_context:
             #     await self.context.chat.add({"role": "assistant", "content": str(message)})
 
-    async def announce(self, message: str, type=None):
+    async def announce(self, message: str, type=None, insert_message=True):
         """called externally to announce things in this channel, such as a reminder sent by the AI"""
         if not type:
             type = "info"
 
         # insert announced message into context
-        await self.context.chat.add({"role": "assistant", "content": f"[System {type}]: {message}"})
+        if insert_message:
+            await self.context.chat.add({"role": "assistant", "content": f"[System {type}]: {message}"})
 
         # and push it
         await self.push(message)

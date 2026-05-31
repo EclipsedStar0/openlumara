@@ -333,13 +333,6 @@ class Commands:
 
                 return result
 
-    # @core.module.command("chat", temporary=True, help={
-    #     "": "show information about current chat",
-    #     "<ID>": "load chat using its ID",
-    #     "rename <new_name>": "rename chat to <new_name>",
-    #     "category <category>": "put chat in category <category>"
-    # })
-    # async def load(self, args: list):
             case "chat":
                 """load chat using its ID"""
                 if not args:

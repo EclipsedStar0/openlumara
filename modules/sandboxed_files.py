@@ -19,7 +19,7 @@ async def get_dir_size(start_path, channel):
             fp = os.path.join(dirpath, f)
             # skip if it is symbolic link
             if not os.path.islink(fp):
-                total_size += await asyncio.os.path.getsize(fp)
+                total_size += os.path.getsize(fp)
 
     return total_size
 

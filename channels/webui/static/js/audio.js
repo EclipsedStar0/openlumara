@@ -28,6 +28,10 @@ const TypewriterAudioManager = {
         reasoning_end: null
     },
     volume: 1.0, // Default volume (0.0 to 1.0)
+    isReasoningPlaying: false, // Track reasoning chime state
+    processingSound: null, // Track processing sound state
+    processingStartTime: 0, // Track when processing started
+    toneTimer: null, // Timer for processing tones
 
     // Initialize IndexedDB and AudioContext
     init: function() {
@@ -135,8 +139,8 @@ const TypewriterAudioManager = {
                     });
                     await putPromise;
 
-                    // decodeaudiodata is synchronous, so no await needed
-                    this.buffers[id] = this.getAudioContext().decodeAudioData(arrayBuffer);
+                    // decodeAudioData returns a Promise, must be awaited
+                    this.buffers[id] = await this.getAudioContext().decodeAudioData(arrayBuffer);
                     resolve(true);
                 } catch (err) {
                     console.error('Error saving audio file:', err);

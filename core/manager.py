@@ -2,14 +2,11 @@ import core
 import modules
 import os
 import sys
-import platform
 import datetime
 import asyncio
-import json
 import json_repair
 import inspect
 import re
-import subprocess
 
 class Manager:
     """the central class that manages everything"""
