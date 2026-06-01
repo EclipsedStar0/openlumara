@@ -56,8 +56,8 @@ class ContentSanitizer:
 
     CONTROL_CHARS = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]')
 
-    # Detects Base64 blocks (at least 12 characters long to reduce false positives)
-    BASE64_PATTERN = re.compile(r'(?:[A-Za-z0-9+/]{4}){3,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?')
+    # Detects Base64 blocks (at least 32 characters long and delimited by word boundaries to avoid mangling text)
+    BASE64_PATTERN = re.compile(r'\b(?:[A-Za-z0-9+/]{4}){8,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?\b')
 
     @classmethod
     def sanitize(cls, content: str, mode: str = "neutralize") -> str:
@@ -257,6 +257,13 @@ class Http(core.module.Module):
 
         def _recursive_sanitize(data):
             if isinstance(data, str):
+                # Skip sanitization for URLs to preserve them intact
+                try:
+                    parsed = urlparse(data)
+                    if parsed.scheme and parsed.netloc:
+                        return data
+                except Exception:
+                    pass
                 return ContentSanitizer.sanitize(data)
             elif isinstance(data, dict):
                 return {k: _recursive_sanitize(v) for k, v in data.items()}
